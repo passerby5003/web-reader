@@ -1,6 +1,6 @@
 import React from 'react'
 
-import Main from '@/app/components'
+import Main from '@/app/components/chat-workspace'
 
 const App = () => {
   return (
