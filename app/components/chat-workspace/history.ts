@@ -4,6 +4,7 @@ export type ChatMessage = {
   content: string
   status: 'pending' | 'complete' | 'error' | 'stopped'
   error?: string
+  waitingMessage?: string
   createdAt: number
 }
 

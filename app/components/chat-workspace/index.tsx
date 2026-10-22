@@ -61,6 +61,7 @@ function Message({ message, onRetry }: { message: ChatMessage; onRetry: () => vo
         <div className="wc-answer-label">{APP_NAME}{message.status === 'pending' && <span>正在整理</span>}</div>
         {message.content && <div className="wc-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} linkTarget="_blank">{message.content}</ReactMarkdown></div>}
         {message.status === 'pending' && !message.content && <div className="wc-thinking" role="status" aria-label="正在生成回复"><i /><i /><i /></div>}
+        {message.status === 'pending' && message.waitingMessage && <p className="wc-waiting-message" role="status">{message.waitingMessage}</p>}
         {message.status === 'error' && <div className="wc-message-error" role="alert"><p>{message.error || '生成失败，请重试。'}</p><button type="button" onClick={onRetry}><ArrowPathIcon />重新发送</button></div>}
         {message.status === 'stopped' && <p className="wc-muted wc-stopped">已停止生成</p>}
         {message.content && message.status !== 'pending' && (
@@ -279,11 +280,6 @@ export default function ChatWorkspace() {
       const updated = { ...chat, title: chat.messages.length ? chat.title : text.trim().replace(/\s+/g, ' ').slice(0, 36), updatedAt: now, messages: [...chat.messages, userMessage, assistantMessage] }
       return [updated, ...previous.filter(item => item.id !== chat.id)]
     })
-    let timedOut = false
-    const timeout = setTimeout(() => {
-      timedOut = true
-      controller.abort()
-    }, 5 * 60 * 1000)
     try {
       if (text.length > MAX_LENGTH)
         throw new Error('输入内容最多为 1024 个字符。')
@@ -301,17 +297,29 @@ export default function ChatWorkspace() {
         body: JSON.stringify({ inputs, response_mode: 'streaming' }),
         signal: controller.signal,
       })
-      const answer = await readChatStream(response, content => patchMessage(chat.id, assistantMessage.id, { content }))
-      patchMessage(chat.id, assistantMessage.id, { content: answer, status: 'complete' })
+      const answer = await readChatStream(response, content => patchMessage(chat.id, assistantMessage.id, { content }), {
+        signal: controller.signal,
+        getWorkflowRun: IS_WORKFLOW
+          ? async (runId, signal) => {
+            const result = await fetch(`${API_PREFIX}/workflows/run/${encodeURIComponent(runId)}`, {
+              credentials: 'include', cache: 'no-store', signal,
+            })
+            if (!result.ok)
+              throw new Error('暂时无法查询工作流状态。')
+            return result.json()
+          }
+          : undefined,
+        onWaiting: waitingMessage => patchMessage(chat.id, assistantMessage.id, { waitingMessage }),
+      })
+      patchMessage(chat.id, assistantMessage.id, { content: answer, status: 'complete', waitingMessage: undefined })
     }
     catch (error) {
-      if (controller.signal.aborted && !timedOut)
+      if (controller.signal.aborted || (error instanceof Error && error.name === 'WorkflowStoppedError'))
         patchMessage(chat.id, assistantMessage.id, { status: 'stopped' })
       else
-        patchMessage(chat.id, assistantMessage.id, { status: 'error', error: timedOut ? '请求超时，请稍后重试。' : error instanceof Error ? error.message : '连接失败，请检查网络后重试。' })
+        patchMessage(chat.id, assistantMessage.id, { status: 'error', error: error instanceof Error ? error.message : '连接失败，请检查网络后重试。' })
     }
     finally {
-      clearTimeout(timeout)
       requestRef.current = null
       setRunningChat(null)
     }

@@ -191,6 +191,7 @@
 .wc-message-actions svg { width: 15px; height: 15px; }
 .wc-message-actions span, .wc-stopped { font-size: 11px; color: var(--wc-muted); }
 .wc-stopped { margin-top: 10px; }
+.wc-waiting-message { margin-top: 10px; color: var(--wc-muted); font-size: 12px; line-height: 1.8; }
 .wc-scroll-bottom { position: absolute; left: calc(50% - 17px); top: -39px; z-index: 2; border: 1px solid var(--wc-border); background: var(--wc-surface); box-shadow: var(--wc-shadow); border-radius: 50%; }
 .wc-markdown { font-size: 14px; line-height: 1.9; overflow-wrap: anywhere; }
 .wc-markdown > * + * { margin-top: 15px; }

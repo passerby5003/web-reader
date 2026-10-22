@@ -9,5 +9,11 @@ export async function POST(request: NextRequest) {
   } = body
   const { user } = getInfo(request)
   const res = await client.runWorkflow(inputs, user, true, files)
-  return new Response(res.data as any)
+  return new Response(res.data as any, {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }
